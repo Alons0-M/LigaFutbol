@@ -1,0 +1,236 @@
+model liga_futbol
+
+-- Enumeraciones para valores controlados
+enum Posicion {defensa, medio, delantero, portero} -- incluir portero ahora que se eliminó
+enum TipoArbitro {principal, VAR, asistente}
+
+---------- Classes ----------
+class Temporada
+attributes
+    numJornadas: Integer
+end
+
+class Equipo
+attributes
+    nombre: String
+    ciudad: String
+    presupuesto: Integer
+end
+
+class Partido
+attributes
+    fecha: String --Quité equipo local/visitante y usé association
+    golesLocal: Integer
+    golesVisitante: Integer
+end
+
+class Jugador
+attributes
+    nombre: String
+    posicion: Posicion
+    dorsal: Integer
+end
+
+
+abstract class EstadisticasTotalJugador
+attributes
+    goles: Integer
+    pasesDados: Integer
+    tarjetasAmarillas: Integer
+    tarjetaRoja: Integer
+    faltasCometidas: Integer
+end
+
+class EstadisticasTotalPortero < EstadisticasTotalJugador
+attributes
+    golesRecibidos: Integer
+    paradasRealizadas: Integer
+end
+
+class EstadisticaJugadorPorteroPartido < EstadisticaJugadorPartido
+attributes
+    paradasRealizadas: Integer
+end
+
+abstract class EstadisticaJugadorPartido
+attributes
+    golesMarcados: Integer
+    asistenciasDadas: Integer
+    pasesDados: Integer
+    tarjetasAmarillas: Integer
+    tarjetaRoja: Integer
+    minutosJugados: Integer
+end
+
+
+class Jornada
+attributes
+    numero : Integer
+end
+
+class Estadio
+attributes
+    nombre: String
+    capacidad: Integer
+end
+
+class Arbitro
+attributes
+    nombre: String
+    tipo: TipoArbitro -- Si es principal, VAR, asistente...
+end
+
+class Clasificacion
+attributes
+    anyo: String
+end
+
+-- Clasificación está compuesta por 20 objetos de la clase LineaClasificacion --
+class LineaClasificacion
+attributes
+    puntos: Integer
+    golesFavor: Integer
+    golesContra: Integer
+    partidosJugados: Integer
+end
+
+class Inscripcion
+attributes
+    fechaInicio: String
+    fechaFin: String
+end
+
+class EstadisticaPartido 
+attributes
+    golesFavor: Integer
+    golesContra: Integer
+    posesion: Integer
+    pases: Integer
+    PrecisionPases: Integer
+    rematesTotales: Integer
+    rematesPuerta: Integer
+    fuerasDeJuego: Integer
+    saquesDeEsquina: Integer
+end
+
+class EstadisticaEquipoPartido 
+attributes
+    golesFavor: Integer
+    golesContra: Integer
+    posesion: Integer
+    pasesDados: Integer
+    rematesTotales: Integer
+    rematesPuerta: Integer
+    penaltisRealizado: Integer
+    penaltisRecibidos: Integer
+end
+
+class Lesion
+attributes
+    tipoLesion: String
+    fechaBaja: String
+    tiempoBaja: Integer
+end
+
+class Tarjetas
+attributes
+    tarjetasAmarillas: Integer
+    tarjetaRoja: Integer
+end
+
+class Sancion
+attributes
+    motivo: String
+    jornadasSancion: Integer
+end
+
+
+--- RELACIONES ---
+composition TemporadaJornadas between
+    Temporada[1] role temporada
+    Jornada[*] role jornadas
+end
+
+composition LineaClasificacionClasificacion between
+    Clasificacion[1] role clasificacion
+    LineaClasificacion[*] role lineas
+end
+
+association LineaEquipo between
+    LineaClasificacion[1] role linea
+    Equipo[1] role equipo
+end
+
+association ArbitrajePartido between
+    Partido[1] role partido
+    Arbitro[*] role cuerpoArbitral
+end
+
+-- quité atributo string partidoLocal/Visitante de Partido y hacer Disputa asi:
+-- 1º
+-- association Disputa between
+--     Partido[1] role partido
+--     Equipo[1] role local
+--     Equipo[1] role visitante
+-- end
+
+-- o 2º
+association Local between
+    Partido[*] role partidosLocal
+    Equipo[1] role local
+end
+
+association Visitante between
+    Partido[*] role partidosVisitante
+    Equipo[1] role visitante
+end
+
+association SedePartido between
+    Estadio[1] role estadio
+    Partido[*] role calendarioEstadio
+end
+
+association JornadaPartidos between
+    Partido[*] role partidosJornada
+    Jornada[1] role jornada
+end
+
+association tarjetasDadas between
+    Arbitro[1] role arbitro
+    Tarjetas[*] role tarjetas
+end
+
+association tarjetasRecibidas between
+    Tarjetas[*] role tarjetas
+    Jugador[*] role jugadores
+end
+
+association Lesiones between
+    Jugador[1] role afectado
+    Lesion[*] role lesiones
+end
+
+association Sanciones between
+    Jugador[1] role sancionado
+    Sancion[0..1] role sanciones
+end
+
+association InscripcionJugadorEquipo between
+    Jugador[*] role jugadorInscrito
+    Equipo[1] role equipoPertenencia
+    Inscripcion[0..*]
+end
+
+constraints
+
+context Partido inv EquipoDiferente:
+    self.local <> self.visitante
+
+context Partido inv GolesNegativos:
+    self.golesLocal >= 0 and self.golesVisitante >= 0
+
+context Jugador inv DorsalUnico:
+    self.equipo.jugadores->isUnique(dorsal)
+
+context Jornada inv JornadasPositivas:
+    self.numero > 0

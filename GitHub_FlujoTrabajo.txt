@@ -1,0 +1,77 @@
+ 1. Inicio: Obtener el proyecto
+Todo empieza descargando el repositorio remoto (GitHub, GitLab, Bitbucket) a tu máquina.
+
+Bash
+
+git clone https://github.com/usuario/proyecto.git
+cd proyecto
+2. Crear tu rama de trabajo (Feature Branch)
+Regla de oro: Nunca trabajes directamente en la rama main (o master). Tampoco se suele usar una única rama developer para todos. Lo ideal es crear una rama específica para la tarea que vas a realizar (ej. arreglar el login, crear botón de pago).
+
+Bash
+
+# Crear la rama y cambiarte a ella (switch)
+git checkout -b login
+
+3. El ciclo de trabajo (Code & Commit)
+Aquí es donde programas. Haces cambios en los archivos.
+
+Bash
+
+# Ver qué has modificado
+git status
+
+# Añadir los archivos al área de preparación (staging)
+git add .
+
+# Guardar los cambios con un mensaje descriptivo
+git commit -m "Agrega validación de correo en el formulario"
+4. Actualizar tu rama (Paso crucial en grupos)
+Antes de subir tus cambios, es probable que tus compañeros hayan subido cosas nuevas a main mientras tú trabajabas. Debes traer esos cambios a tu rama para asegurarte de que tu código no rompe nada actual.
+
+Bash
+
+# Primero te aseguras de tener la info más reciente del remoto
+git fetch origin
+
+# Si estás en tu rama 'feature/nuevo-login', fusionas lo nuevo de main en tu rama
+git merge origin/main
+Si hay conflictos (mismas líneas modificadas), los resuelves aquí en tu ordenador.
+
+5. Subir tu rama al servidor (Push)
+En lugar de hacer merge a main localmente, subes tu rama al servidor.
+
+Bash
+
+git push origin login
+6. El Pull Request (PR) / Merge Request
+Este paso no se hace en la terminal, sino en la página web (GitHub/GitLab).
+
+Vas al repositorio web.
+
+Verás un botón que dice "Compare & Pull Request".
+
+Creas la solicitud.
+
+¿Por qué hacemos esto?
+
+Code Review: Tus compañeros pueden leer tu código antes de que entre a main.
+
+Tests Automáticos: Se ejecutan pruebas para verificar que no rompiste nada.
+
+7. Fusión final (Merge)
+Una vez que tus compañeros aprueban el PR, se hace clic en el botón Merge en la web. Ahora tu código es parte oficial de main.
+
+8. Limpieza y Vuelta a empezar
+En tu ordenador, vuelves a la rama principal, la actualizas y borras tu rama vieja.
+
+Bash
+
+# Volver a main
+git checkout main
+
+# Bajar la versión final que ya incluye tus cambios (y los de otros)
+git pull origin main
+
+# Borrar tu rama local (ya no la necesitas)
+git branch -d login
