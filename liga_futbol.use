@@ -82,7 +82,7 @@ end
 
 class Clasificacion
 attributes
-    anyo: String
+    anyo: Integer
 end
 
 -- Clasificación está compuesta por 20 objetos de la clase LineaClasificacion --
@@ -215,11 +215,11 @@ association Sanciones between
     Sancion[0..1] role sanciones
 end
 
-association InscripcionJugadorEquipo between
-    Jugador[*] role jugadorInscrito
-    Equipo[1] role equipoPertenencia
-    Inscripcion[0..*]
-end
+-- association InscripcionJugadorEquipo between  --Posibilidad de association
+--     Jugador[*] role jugadorInscrito
+--     Equipo[1] role equipoPertenencia
+--     Inscripcion[0..*]
+-- end
 
 constraints
 
