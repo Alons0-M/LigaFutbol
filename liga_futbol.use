@@ -3,23 +3,27 @@ model liga_futbol
 -- Enumeraciones para valores controlados
 enum Posicion {defensa, medio, delantero, portero} -- incluir portero ahora que se eliminó
 enum TipoArbitro {principal, VAR, asistente}
+enum TipoZona {descenso, champions, europaLeague, conferenceLeague}
+enum TipoFicha {primerEquipo, Filial}
 
 ---------- Classes ----------
 class Temporada
 attributes
     numJornadas: Integer
+    anyo: Integer
 end
 
 class Equipo
 attributes
     nombre: String
     ciudad: String
+    entrenador: String --Nuevo
     presupuesto: Integer
 end
 
 class Partido
 attributes
-    fecha: String --Quité equipo local/visitante y usé association
+    fecha: String
     golesLocal: Integer
     golesVisitante: Integer
 end
@@ -27,6 +31,8 @@ end
 class Jugador
 attributes
     nombre: String
+    edad: Integer
+    fechaNacimiento: String
     posicion: Posicion
     dorsal: Integer
 end
@@ -39,6 +45,16 @@ attributes
     tarjetasAmarillas: Integer
     tarjetaRoja: Integer
     faltasCometidas: Integer
+end
+
+abstract class EstadisticasTotalEquipo
+attributes
+    golesFavor: Integer
+    golesContra: Integer
+    victorias: Integer
+    derrotas: Integer
+    empates: Integer
+    diferenciaGoles: Integer
 end
 
 class EstadisticasTotalPortero < EstadisticasTotalJugador
@@ -82,7 +98,8 @@ end
 
 class Clasificacion
 attributes
-    anyo: Integer
+    posicion: Integer
+    zona: TipoZona
 end
 
 -- Clasificación está compuesta por 20 objetos de la clase LineaClasificacion --
@@ -92,12 +109,17 @@ attributes
     golesFavor: Integer
     golesContra: Integer
     partidosJugados: Integer
+    diferenciaGoles: Integer
+    victorias: Integer
+    derrotas: Integer
+    empates: Integer
 end
 
 class Inscripcion
 attributes
     fechaInicio: String
     fechaFin: String
+    ficha: TipoFicha
 end
 
 class EstadisticaPartido 
@@ -185,6 +207,37 @@ association Visitante between
     Equipo[1] role visitante
 end
 
+association EstadisticaLocal between
+    Partido[1] role partidosLocal
+    EstadisticaEquipoPartido[1] role Estadisticalocal
+end
+
+association EstadisticaVisitante between
+    Partido[1] role partidosVisitante
+    EstadisticaEquipoPartido[1] role Estadisticavisitante
+end
+
+association EstadisticaJugadores between
+    Partido[1] role partido
+    EstadisticaJugadorPartido[*] role Estadisticajugador
+    Jugador[1] role jugador
+end
+
+association EstadisticaEquipos between
+    EstadisticaPartido[1] role estadisticaPartido
+    EstadisticaEquipoPartido[2] role EstadisticaEquipos
+end
+
+association EstadisticasTotalesJugador between
+    EstadisticasTotalJugador[1] role estadisticaJugador
+    EstadisticaJugadorPartido[*] role EstadisticaJugadorPartido
+end
+
+association EstadisticasTotalesEquipo between
+    EstadisticasTotalEquipo[1] role estadisticaTotal
+    EstadisticaEquipoPartido[*] role EstadisticaEquipo
+end
+
 association SedePartido between
     Estadio[1] role estadio
     Partido[*] role calendarioEstadio
@@ -215,11 +268,15 @@ association Sanciones between
     Sancion[0..1] role sanciones
 end
 
--- association InscripcionJugadorEquipo between  --Posibilidad de association
---     Jugador[*] role jugadorInscrito
---     Equipo[1] role equipoPertenencia
---     Inscripcion[0..*]
--- end
+association PertenenciaJugadorEquipo between
+    Jugador[1] role jugadorAsociado
+    Inscripcion[1] role fichaInscripcion
+end
+
+association InscripcionEquipo between
+    Inscripcion[*] role inscripcionFicha
+    Equipo[1] role equipoAsociado
+end
 
 constraints
 
@@ -231,3 +288,14 @@ context Partido inv GolesNegativos:
 
 context Jornada inv JornadasPositivas:
     self.numero > 0
+
+context Jugador inv DorsalesReglamentarios:
+    self.dorsal >= 1 and self.dorsal <= 50
+
+-- 3. Simple (Atributo de Portero)
+context EstadisticaJugadorPorteroPartido inv ParadasPositivas:
+    self.paradasRealizadas >= 0
+
+-- 5. Relacional (Usa association ArbitrajePartido)
+context Partido inv ExisteArbitroPrincipal: 
+    self.cuerpoArbitral->exists(a | a.tipo = TipoArbitro::principal)
