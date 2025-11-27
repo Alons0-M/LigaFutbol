@@ -45,6 +45,8 @@ attributes
     tarjetasAmarillas: Integer
     tarjetaRoja: Integer
     faltasCometidas: Integer
+    golesRecibidos: Integer
+    paradasRealizadas: Integer
 end
 
 abstract class EstadisticasTotalEquipo
@@ -56,28 +58,6 @@ attributes
     empates: Integer
     diferenciaGoles: Integer
 end
-
-class EstadisticasTotalPortero < EstadisticasTotalJugador
-attributes
-    golesRecibidos: Integer
-    paradasRealizadas: Integer
-end
-
-class EstadisticaJugadorPorteroPartido < EstadisticaJugadorPartido
-attributes
-    paradasRealizadas: Integer
-end
-
-abstract class EstadisticaJugadorPartido
-attributes
-    golesMarcados: Integer
-    asistenciasDadas: Integer
-    pasesDados: Integer
-    tarjetasAmarillas: Integer
-    tarjetaRoja: Integer
-    minutosJugados: Integer
-end
-
 
 class Jornada
 attributes
@@ -135,18 +115,6 @@ attributes
     saquesDeEsquina: Integer
 end
 
-class EstadisticaEquipoPartido 
-attributes
-    golesFavor: Integer
-    golesContra: Integer
-    posesion: Integer
-    pasesDados: Integer
-    rematesTotales: Integer
-    rematesPuerta: Integer
-    penaltisRealizado: Integer
-    penaltisRecibidos: Integer
-end
-
 class Lesion
 attributes
     tipoLesion: String
@@ -166,6 +134,46 @@ attributes
     jornadasSancion: Integer
 end
 
+abstract associationclass EstadisticaJugadorPartido between
+    Partido[*] role partido
+    Jugador[*] role jugador
+attributes
+    golesMarcados: Integer
+    asistenciasDadas: Integer
+    pasesDados: Integer
+    tarjetasAmarillas: Integer
+    tarjetaRoja: Integer
+    minutosJugados: Integer
+    paradasRealizadas: Integer
+end
+
+associationclass EstadisticaLocalPartido between
+    Partido[1] role local
+    Equipo[2] role EstadisticaLocal
+attributes
+    golesFavor: Integer
+    golesContra: Integer
+    posesion: Integer
+    pasesDados: Integer
+    rematesTotales: Integer
+    rematesPuerta: Integer
+    penaltisRealizado: Integer
+    penaltisRecibidos: Integer
+end
+
+associationclass EstadisticaVisitantePartido between
+    Partido[1] role visitante
+    Equipo[2] role EstadisticaVisitante
+attributes
+    golesFavor: Integer
+    golesContra: Integer
+    posesion: Integer
+    pasesDados: Integer
+    rematesTotales: Integer
+    rematesPuerta: Integer
+    penaltisRealizado: Integer
+    penaltisRecibidos: Integer
+end
 
 --- RELACIONES ---
 composition TemporadaJornadas between
@@ -188,54 +196,14 @@ association ArbitrajePartido between
     Arbitro[*] role cuerpoArbitral
 end
 
--- quité atributo string partidoLocal/Visitante de Partido y hacer Disputa asi:
--- 1º
--- association Disputa between
---     Partido[1] role partido
---     Equipo[1] role local
---     Equipo[1] role visitante
--- end
-
--- o 2º
-association Local between
-    Partido[*] role partidosLocal
-    Equipo[1] role local
-end
-
-association Visitante between
-    Partido[*] role partidosVisitante
-    Equipo[1] role visitante
-end
-
-association EstadisticaLocal between
-    Partido[1] role partidosLocal
-    EstadisticaEquipoPartido[1] role Estadisticalocal
-end
-
-association EstadisticaVisitante between
-    Partido[1] role partidosVisitante
-    EstadisticaEquipoPartido[1] role Estadisticavisitante
-end
-
-association EstadisticaJugadores between
-    Partido[1] role partido
-    EstadisticaJugadorPartido[*] role Estadisticajugador
-    Jugador[1] role jugador
-end
-
-association EstadisticaEquipos between
+association EstadisticaEquiposPartidos between
     EstadisticaPartido[1] role estadisticaPartido
-    EstadisticaEquipoPartido[2] role EstadisticaEquipos
+    Partido[1] role EstadisticaEquipos
 end
 
-association EstadisticasTotalesJugador between
-    EstadisticasTotalJugador[1] role estadisticaJugador
-    EstadisticaJugadorPartido[*] role EstadisticaJugadorPartido
-end
-
-association EstadisticasTotalesEquipo between
+composition EstadisticasTotalesEquipo between
+    Equipo[1] role EstadisticaEquipo
     EstadisticasTotalEquipo[1] role estadisticaTotal
-    EstadisticaEquipoPartido[*] role EstadisticaEquipo
 end
 
 association SedePartido between
@@ -278,10 +246,19 @@ association InscripcionEquipo between
     Equipo[1] role equipoAsociado
 end
 
+composition EstadisticaTotalJugadores between
+    Jugador[1] role jugador
+    EstadisticasTotalJugador[1] role estadistica
+end
+
 constraints
+-- ==========================================
+-- REGLAS BASICAS DE PARTIDO
+-- ==========================================
 
 context Partido inv EquipoDiferente:
-    self.local <> self.visitante
+    -- Los equipos del conjunto local y del conjunto visitante no pueden tener intersección
+    self.EstadisticaLocal->intersection(self.EstadisticaVisitante)->isEmpty()
 
 context Partido inv GolesNegativos:
     self.golesLocal >= 0 and self.golesVisitante >= 0
@@ -290,12 +267,124 @@ context Jornada inv JornadasPositivas:
     self.numero > 0
 
 context Jugador inv DorsalesReglamentarios:
-    self.dorsal >= 1 and self.dorsal <= 50
+    self.dorsal >= 1 and self.dorsal <= 99 -- Ajustado a 99 que es más estándar, o 50 si prefieres
 
--- 3. Simple (Atributo de Portero)
-context EstadisticaJugadorPorteroPartido inv ParadasPositivas:
-    self.paradasRealizadas >= 0
+-- ==========================================
+-- REGLAS DE ARBITRAJE
+-- ==========================================
 
--- 5. Relacional (Usa association ArbitrajePartido)
 context Partido inv ExisteArbitroPrincipal: 
     self.cuerpoArbitral->exists(a | a.tipo = TipoArbitro::principal)
+
+-- ==========================================
+-- COHERENCIA DE MARCADOR Y ESTADISTICAS
+-- ==========================================
+-- Nota: Al ser AssociationClasses, navegamos desde la estadística hacia el partido usando el rol 'local' o 'visitante'
+
+-- 1. Coherencia Goles Local
+context EstadisticaLocalPartido inv CoherenciaGolesLocal:
+    self.local.golesLocal = self.golesFavor
+
+-- 2. Coherencia Goles Visitante
+context EstadisticaVisitantePartido inv CoherenciaGolesVisitante:
+    self.visitante.golesVisitante = self.golesFavor
+
+-- 3. Coherencia Defensiva (Cruzada)
+-- Para verificar esto desde el Partido es necesario acceder a ambas instancias de asociación.
+context Partido inv CoherenciaGolesCruzados:
+    -- Obtenemos los objetos de enlace (link objects)
+    let statLocal = EstadisticaLocalPartido.allInstances->any(x | x.local = self) in
+    let statVisit = EstadisticaVisitantePartido.allInstances->any(x | x.visitante = self) in
+    
+    (statLocal.isDefined() and statVisit.isDefined()) implies
+        (statLocal.golesContra = self.golesVisitante and
+         statVisit.golesContra = self.golesLocal)
+
+-- 4. Suma de Posesión (100%)
+context Partido inv SumaPosesionCien:
+    let statLocal = EstadisticaLocalPartido.allInstances->any(x | x.local = self) in
+    let statVisit = EstadisticaVisitantePartido.allInstances->any(x | x.visitante = self) in
+    
+    (statLocal.isDefined() and statVisit.isDefined()) implies
+        (statLocal.posesion + statVisit.posesion = 100)
+
+-- ==========================================
+-- VALIDEZ DE DATOS ESTADÍSTICOS (LOCAL Y VISITANTE)
+-- ==========================================
+
+-- 5. Valores Positivos (Local)
+context EstadisticaLocalPartido inv ValoresPositivosLocal:
+    self.golesFavor >= 0 and self.golesContra >= 0 and 
+    self.posesion >= 0 and self.pasesDados >= 0 and
+    self.rematesTotales >= 0 and self.rematesPuerta >= 0
+
+-- 5b. Valores Positivos (Visitante)
+context EstadisticaVisitantePartido inv ValoresPositivosVisitante:
+    self.golesFavor >= 0 and self.golesContra >= 0 and 
+    self.posesion >= 0 and self.pasesDados >= 0 and
+    self.rematesTotales >= 0 and self.rematesPuerta >= 0
+
+-- 6. Lógica de Remates (Local)
+context EstadisticaLocalPartido inv LogicaRematesLocal:
+    self.rematesPuerta <= self.rematesTotales
+
+-- 6b. Lógica de Remates (Visitante)
+context EstadisticaVisitantePartido inv LogicaRematesVisitante:
+    self.rematesPuerta <= self.rematesTotales
+
+-- ==========================================
+-- REGLAS DE JUGADORES Y ACTUACIÓN
+-- ==========================================
+
+-- 7. Edad mínima
+context Jugador inv EdadMinimaProfesional:
+    self.edad >= 16
+
+-- 8, 9, 10. Tarjetas y Tiempo (Contexto: EstadisticaJugadorPartido)
+context EstadisticaJugadorPartido inv ReglasActuacionJugador:
+    -- Limite Tarjetas
+    (self.tarjetasAmarillas >= 0 and self.tarjetasAmarillas <= 2) and
+    (self.tarjetaRoja >= 0 and self.tarjetaRoja <= 1) and
+    -- Doble Amarilla implica Roja
+    (self.tarjetasAmarillas = 2 implies self.tarjetaRoja = 1) and
+    -- Minutos lógicos
+    (self.minutosJugados >= 0 and self.minutosJugados <= 130)
+
+-- ==========================================
+-- REGLAS DE INFRAESTRUCTURA Y LOGÍSTICA
+-- ==========================================
+
+-- 12. Capacidad Estadio
+context Estadio inv CapacidadPositiva:
+    self.capacidad > 0
+
+-- 13. Presupuesto Equipo
+context Equipo inv PresupuestoViable:
+    self.presupuesto >= 0
+
+-- ==========================================
+-- REGLAS DE CLASIFICACIÓN
+-- ==========================================
+
+-- 14 y 15. Lógica de Tabla
+context LineaClasificacion inv DatosClasificacion:
+    -- Puntos lógicos
+    (self.puntos >= 0 and self.puntos <= (self.partidosJugados * 3)) and
+    -- Datos positivos
+    (self.partidosJugados >= 0 and self.golesFavor >= 0 and self.golesContra >= 0)
+
+-- 16. Año Temporada
+context Temporada inv AnyoValido:
+    self.anyo > 1900
+
+-- ==========================================
+-- REGLAS ESPECÍFICAS DE POSICIONES
+-- ==========================================
+
+-- -- 17. Stats Portero Totales
+-- context EstadisticasTotalPortero inv StatsPorteroTotalesPositivas:
+--     self.golesRecibidos >= 0 and self.paradasRealizadas >= 0
+
+-- -- Stats Portero Partido (EstadisticaJugadorPorteroPartido)
+-- context EstadisticaJugadorPorteroPartido inv StatsPorteroPartidoPositivas:
+--     self.paradasRealizadas >= 0
