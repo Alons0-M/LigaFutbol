@@ -40,23 +40,59 @@ end
 
 abstract class EstadisticasTotalJugador
 attributes
-    goles: Integer
-    pasesDados: Integer
-    tarjetasAmarillas: Integer
-    tarjetaRoja: Integer
-    faltasCometidas: Integer
-    golesRecibidos: Integer
-    paradasRealizadas: Integer
+    goles: Integer derive: 
+        self.jugador.estadisticaJugadorPartido->collect(s | s.golesMarcados)->sum()
+    pasesDados: Integer derive:
+        self.jugador.estadisticaJugadorPartido->collect(s | s.pasesDados)->sum()
+    tarjetasAmarillas: Integer derive:
+        self.jugador.estadisticaJugadorPartido->collect(s | s.tarjetasAmarillas)->sum()
+    tarjetaRoja: Integer derive:
+        self.jugador.estadisticaJugadorPartido->collect(s | s.tarjetaRoja)->sum()
+    faltasCometidas: Integer derive:
+        self.jugador.estadisticaJugadorPartido->collect(s | s.faltasCometidas)->sum()
+    golesRecibidos: Integer derive:
+        self.jugador.estadisticaJugadorPartido->collect(s | s.golesRecibidos)->sum()
+    paradasRealizadas: Integer derive:
+        self.jugador.estadisticaJugadorPartido->collect(s | s.paradasRealizadas)->sum()
 end
 
 abstract class EstadisticasTotalEquipo
 attributes
-    golesFavor: Integer
-    golesContra: Integer
-    victorias: Integer
-    derrotas: Integer
-    empates: Integer
-    diferenciaGoles: Integer
+    golesFavor: Integer derive:
+        -- Toma todas las estadísticas locales, y selecciona aquellas donde el equipo
+        -- local (estadisticaLocal) es el equipo de ESTA instancia.
+        EstadisticaLocalPartido.allInstances->select(s | s.estadisticaLocal = self.EstadisticaEquipo)
+            ->collect(s | s.golesFavor)->sum() +
+        -- Mismo proceso para los partidos de visitante.
+        EstadisticaVisitantePartido.allInstances->select(s | s.estadisticaVisitante = self.EstadisticaEquipo)
+            ->collect(s | s.golesFavor)->sum()
+    
+    golesContra: Integer derive:
+        EstadisticaLocalPartido.allInstances->select(s | s.estadisticaLocal = self.EstadisticaEquipo)
+            ->collect(s | s.golesContra)->sum() +
+        EstadisticaVisitantePartido.allInstances->select(s | s.estadisticaVisitante = self.EstadisticaEquipo)
+            ->collect(s | s.golesContra)->sum()
+
+    victorias: Integer derive:
+        -- Victorias Locales
+        EstadisticaLocalPartido.allInstances->select(s | s.estadisticaLocal = self.EstadisticaEquipo and s.golesFavor > s.golesContra)->size() +
+        -- Victorias Visitantes
+        EstadisticaVisitantePartido.allInstances->select(s | s.estadisticaVisitante = self.EstadisticaEquipo and s.golesFavor > s.golesContra)->size()
+        
+    derrotas: Integer derive:
+        -- Derrotas Locales
+        EstadisticaLocalPartido.allInstances->select(s | s.estadisticaLocal = self.EstadisticaEquipo and s.golesFavor < s.golesContra)->size() +
+        -- Derrotas Visitantes
+        EstadisticaVisitantePartido.allInstances->select(s | s.estadisticaVisitante = self.EstadisticaEquipo and s.golesFavor < s.golesContra)->size()
+
+    empates: Integer derive:
+        -- Empates Locales
+        EstadisticaLocalPartido.allInstances->select(s | s.estadisticaLocal = self.EstadisticaEquipo and s.golesFavor = s.golesContra)->size() +
+        -- Empates Visitantes
+        EstadisticaVisitantePartido.allInstances->select(s | s.estadisticaVisitante = self.EstadisticaEquipo and s.golesFavor = s.golesContra)->size()
+        
+    diferenciaGoles: Integer derive:
+        self.golesFavor - self.golesContra
 end
 
 class Jornada
@@ -82,17 +118,24 @@ attributes
     zona: TipoZona
 end
 
--- Clasificación está compuesta por 20 objetos de la clase LineaClasificacion --
 class LineaClasificacion
 attributes
-    puntos: Integer
-    golesFavor: Integer
-    golesContra: Integer
-    partidosJugados: Integer
-    diferenciaGoles: Integer
-    victorias: Integer
-    derrotas: Integer
-    empates: Integer
+    golesFavor: Integer derive:
+        self.equipo.estadisticaTotal.golesFavor
+    golesContra: Integer derive:
+        self.equipo.estadisticaTotal.golesContra
+    victorias: Integer derive:
+        self.equipo.estadisticaTotal.victorias
+    derrotas: Integer derive:
+        self.equipo.estadisticaTotal.derrotas
+    empates: Integer derive:
+        self.equipo.estadisticaTotal.empates
+    puntos: Integer derive:
+        (self.victorias * 3) + (self.empates * 1) + (self.derrotas * 0)
+    diferenciaGoles: Integer derive:
+        self.golesFavor - self.golesContra
+    partidosJugados: Integer derive:
+        self.victorias + self.derrotas + self.empates
 end
 
 class Inscripcion
@@ -104,8 +147,10 @@ end
 
 class EstadisticaPartido 
 attributes
-    golesFavor: Integer
-    golesContra: Integer
+    golesLocal: Integer derive:
+        self.EstadisticaEquipos.golesLocal
+    golesVisitante: Integer derive:
+        self.EstadisticaEquipos.golesVisitante
     posesion: Integer
     pases: Integer
     PrecisionPases: Integer
@@ -122,12 +167,6 @@ attributes
     tiempoBaja: Integer
 end
 
-class Tarjetas
-attributes
-    tarjetasAmarillas: Integer
-    tarjetaRoja: Integer
-end
-
 class Sancion
 attributes
     motivo: String
@@ -139,8 +178,10 @@ abstract associationclass EstadisticaJugadorPartido between
     Jugador[*] role jugador
 attributes
     golesMarcados: Integer
+    golesRecibidos: Integer 
     asistenciasDadas: Integer
     pasesDados: Integer
+    faltasCometidas: Integer 
     tarjetasAmarillas: Integer
     tarjetaRoja: Integer
     minutosJugados: Integer
@@ -149,10 +190,12 @@ end
 
 associationclass EstadisticaLocalPartido between
     Partido[1] role local
-    Equipo[2] role EstadisticaLocal
+    Equipo[*] role estadisticaLocal
 attributes
-    golesFavor: Integer
-    golesContra: Integer
+    golesFavor: Integer derive:
+        self.local.golesLocal
+    golesContra: Integer derive:
+        self.local.golesVisitante
     posesion: Integer
     pasesDados: Integer
     rematesTotales: Integer
@@ -163,10 +206,12 @@ end
 
 associationclass EstadisticaVisitantePartido between
     Partido[1] role visitante
-    Equipo[2] role EstadisticaVisitante
+    Equipo[*] role estadisticaVisitante
 attributes
-    golesFavor: Integer
-    golesContra: Integer
+    golesFavor: Integer derive:
+        self.visitante.golesVisitante
+    golesContra: Integer derive:
+        self.visitante.golesLocal
     posesion: Integer
     pasesDados: Integer
     rematesTotales: Integer
@@ -192,7 +237,7 @@ association LineaEquipo between
 end
 
 association ArbitrajePartido between
-    Partido[1] role partido
+    Partido[*] role partido
     Arbitro[*] role cuerpoArbitral
 end
 
@@ -216,16 +261,6 @@ association JornadaPartidos between
     Jornada[1] role jornada
 end
 
-association tarjetasDadas between
-    Arbitro[1] role arbitro
-    Tarjetas[*] role tarjetas
-end
-
-association tarjetasRecibidas between
-    Tarjetas[*] role tarjetas
-    Jugador[*] role jugadores
-end
-
 association Lesiones between
     Jugador[1] role afectado
     Lesion[*] role lesiones
@@ -233,7 +268,7 @@ end
 
 association Sanciones between
     Jugador[1] role sancionado
-    Sancion[0..1] role sanciones
+    Sancion[*] role sanciones
 end
 
 association PertenenciaJugadorEquipo between
@@ -258,7 +293,7 @@ constraints
 
 context Partido inv EquipoDiferente:
     -- Los equipos del conjunto local y del conjunto visitante no pueden tener intersección
-    self.EstadisticaLocal->intersection(self.EstadisticaVisitante)->isEmpty()
+    self.estadisticaLocal->intersection(self.estadisticaVisitante)->isEmpty()
 
 context Partido inv GolesNegativos:
     self.golesLocal >= 0 and self.golesVisitante >= 0
@@ -280,14 +315,6 @@ context Partido inv ExisteArbitroPrincipal:
 -- COHERENCIA DE MARCADOR Y ESTADISTICAS
 -- ==========================================
 -- Nota: Al ser AssociationClasses, navegamos desde la estadística hacia el partido usando el rol 'local' o 'visitante'
-
--- 1. Coherencia Goles Local
-context EstadisticaLocalPartido inv CoherenciaGolesLocal:
-    self.local.golesLocal = self.golesFavor
-
--- 2. Coherencia Goles Visitante
-context EstadisticaVisitantePartido inv CoherenciaGolesVisitante:
-    self.visitante.golesVisitante = self.golesFavor
 
 -- 3. Coherencia Defensiva (Cruzada)
 -- Para verificar esto desde el Partido es necesario acceder a ambas instancias de asociación.
@@ -375,16 +402,168 @@ context LineaClasificacion inv DatosClasificacion:
 
 -- 16. Año Temporada
 context Temporada inv AnyoValido:
-    self.anyo > 1900
+    self.anyo >= 1929
 
 -- ==========================================
 -- REGLAS ESPECÍFICAS DE POSICIONES
 -- ==========================================
 
--- -- 17. Stats Portero Totales
--- context EstadisticasTotalPortero inv StatsPorteroTotalesPositivas:
---     self.golesRecibidos >= 0 and self.paradasRealizadas >= 0
+context EstadisticaJugadorPartido inv EstadisticasDePorteroSoloParaPorteros:
+    self.jugador.posicion <> Posicion::portero implies
+    (
+        self.golesRecibidos = 0 and
+        self.paradasRealizadas = 0
+    )
 
--- -- Stats Portero Partido (EstadisticaJugadorPorteroPartido)
--- context EstadisticaJugadorPorteroPartido inv StatsPorteroPartidoPositivas:
---     self.paradasRealizadas >= 0
+-- ==========================================
+-- REGLAS DORSALES
+-- ==========================================
+context Jugador inv ControlDorsalesPorFicha:
+    let esPrimerEquipo = (self.fichaInscripcion.ficha = TipoFicha::primerEquipo) in
+    let esPortero = (self.posicion = Posicion::portero) in
+
+    if esPrimerEquipo then
+        -- Lógica para PRIMER EQUIPO (1-25)
+        if esPortero then
+            -- Porteros primer equipo: Solo 1, 13 o 25
+            Set{1, 13, 25}->includes(self.dorsal)
+        else
+            -- Jugadores de campo primer equipo: 1-25, pero PROHIBIDO usar 1, 13, 25
+            (self.dorsal >= 1 and self.dorsal <= 25) and
+            not Set{1, 13, 25}->includes(self.dorsal)
+        endif
+    else
+        -- Lógica para FILIAL (26-99)
+        -- Aquí da igual si es portero o jugador de campo, la regla es el rango
+        self.dorsal >= 26 and self.dorsal <= 99
+    endif
+
+context EstadisticaLocalPartido inv TirosPuertaLogicosLocal:
+    self.rematesTotales >= self.rematesPuerta
+
+context EstadisticaVisitantePartido inv TirosPuertaLogicosVisitante:
+    self.rematesTotales >= self.rematesPuerta
+
+context Equipo inv NombreEquipoUnico:
+    Equipo.allInstances->forAll(e | e <> self implies e.nombre <> self.nombre)
+
+context Estadio inv NombreEstadioUnico:
+    Estadio.allInstances->forAll(e | e <> self implies e.nombre <> self.nombre)
+
+context Partido inv MaximoJugadoresEnCampoTotal:
+    -- Obtenemos todas las stats de jugadores asociadas a ESTE partido
+    let statsJugadores = EstadisticaJugadorPartido.allInstances->select(s | s.partido = self) in
+    -- Contamos cuántos han jugado más de 0 minutos
+    statsJugadores->select(s | s.minutosJugados > 0)->size() <= 32
+
+context EstadisticaJugadorPartido inv LogicaTarjetas:
+    (self.tarjetasAmarillas = 2 implies self.tarjetaRoja = 1) 
+    and
+    (self.tarjetaRoja = 0 implies self.tarjetasAmarillas < 2)
+
+context EstadisticaJugadorPartido inv SoloPorterosParan:
+    self.paradasRealizadas > 0 implies self.jugador.posicion = Posicion::portero
+
+context Jornada inv EquipoJuegaUnaVezPorJornada:
+    -- Obtenemos todos los partidos de esta jornada
+    let partidos = self.partidosJornada in
+    -- Obtenemos la lista de equipos locales de esos partidos
+    let locales = partidos->collect(p | EstadisticaLocalPartido.allInstances->any(x | x.local = p).estadisticaLocal) in
+    -- Obtenemos la lista de equipos visitantes
+    let visitantes = partidos->collect(p | EstadisticaVisitantePartido.allInstances->any(x | x.visitante = p).estadisticaVisitante) in
+    -- La unión de todos los equipos participantes no debe tener duplicados
+    locales->union(visitantes)->isUnique(e | e)
+
+context Temporada inv TotalJornadasLaLiga:
+    self.numJornadas = 38
+
+context EstadisticaPartido inv StatsPartidoNoNegativas:
+    self.golesLocal >= 0 and self.golesVisitante >= 0 and
+    self.posesion >= 0 and self.pases >= 0 and
+    self.PrecisionPases >= 0 and -- Asumo que es un entero (0-100)
+    self.rematesTotales >= 0 and self.rematesPuerta >= 0 and
+    self.fuerasDeJuego >= 0 and self.saquesDeEsquina >= 0
+
+context EstadisticaJugadorPartido inv StatsJugadorPartidoNoNegativas:
+    self.golesMarcados >= 0 and
+    self.golesRecibidos >= 0 and
+    self.asistenciasDadas >= 0 and
+    self.pasesDados >= 0 and
+    self.faltasCometidas >= 0 and
+    self.tarjetasAmarillas >= 0 and
+    self.tarjetaRoja >= 0 and
+    self.minutosJugados >= 0 and
+    self.paradasRealizadas >= 0
+
+context EstadisticasTotalJugador inv StatsTotalesJugadorNoNegativas:
+    self.goles >= 0 and
+    self.pasesDados >= 0 and
+    self.tarjetasAmarillas >= 0 and
+    self.tarjetaRoja >= 0 and
+    self.faltasCometidas >= 0 and
+    self.golesRecibidos >= 0 and
+    self.paradasRealizadas >= 0
+
+context EstadisticasTotalEquipo inv StatsTotalesEquipoNoNegativas:
+    self.golesFavor >= 0 and
+    self.golesContra >= 0 and
+    self.victorias >= 0 and
+    self.derrotas >= 0 and
+    self.empates >= 0
+
+context EstadisticaLocalPartido inv StatsLocalNoNegativas:
+    self.posesion >= 0 and
+    self.pasesDados >= 0 and
+    self.rematesTotales >= 0 and
+    self.rematesPuerta >= 0 and
+    self.penaltisRealizado >= 0 and
+    self.penaltisRecibidos >= 0
+
+context EstadisticaVisitantePartido inv StatsVisitanteNoNegativas:
+    self.posesion >= 0 and
+    self.pasesDados >= 0 and
+    self.rematesTotales >= 0 and
+    self.rematesPuerta >= 0 and
+    self.penaltisRealizado >= 0 and
+    self.penaltisRecibidos >= 0
+
+context LineaClasificacion inv DatosTablaNoNegativos:
+    self.puntos >= 0 and
+    self.golesFavor >= 0 and
+    self.golesContra >= 0 and
+    self.partidosJugados >= 0 and
+    self.victorias >= 0 and
+    self.derrotas >= 0 and
+    self.empates >= 0
+
+context Sancion inv JornadasSancionPositivas:
+    self.jornadasSancion >= 0
+
+context Lesion inv TiempoBajaPositivo:
+    self.tiempoBaja >= 0
+
+context EstadisticasTotalJugador inv CoherenciaSumaGoles:
+    self.goles = self.jugador.estadisticaJugadorPartido->collect(s | s.golesMarcados)->sum()
+
+context EstadisticasTotalJugador inv CoherenciaSumaTarjetas:
+    self.tarjetasAmarillas = self.jugador.estadisticaJugadorPartido->collect(s | s.tarjetasAmarillas)->sum() 
+    and
+    self.tarjetaRoja = self.jugador.estadisticaJugadorPartido->collect(s | s.tarjetaRoja)->sum()
+
+context Clasificacion inv EquilibrioVictoriasDerrotas:
+    self.lineas->collect(l | l.victorias)->sum() = self.lineas->collect(l | l.derrotas)->sum()
+
+context Clasificacion inv EquilibrioGoles:
+    self.lineas->collect(l | l.golesFavor)->sum() = self.lineas->collect(l | l.golesContra)->sum()
+
+context Partido inv JugadoresUnicosEnPartido:
+    -- Obtenemos todas las estadísticas de jugadores de este partido
+    let stats = EstadisticaJugadorPartido.allInstances->select(s | s.partido = self) in
+    -- Verificamos que no haya jugadores repetidos en esa lista
+    stats->isUnique(s | s.jugador)
+
+context Inscripcion inv FechaFinPosteriorInicio:
+    self.fechaFin > self.fechaInicio
+
+context Equipo inv EntrenadorObligatorio:
+    self.entrenador.size() > 0 and self.entrenador <> null

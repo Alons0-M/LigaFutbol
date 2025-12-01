@@ -1,0 +1,196 @@
+-- =============================================================
+-- Script de prueba para Liga de Futbol (liga_futbol.use)
+-- =============================================================
+reset
+
+-- 1. Creación de la Temporada y Jornada
+-- -------------------------------------------------------------
+!create t2024 : Temporada
+!set t2024.anyo := 2024
+!set t2024.numJornadas := 38
+
+!create j1 : Jornada
+!set j1.numero := 1
+!insert (t2024, j1) into TemporadaJornadas
+
+-- 2. Creación de Estadios y Árbitros
+-- -------------------------------------------------------------
+!create bernabeu : Estadio
+!set bernabeu.nombre := 'Santiago Bernabeu'
+!set bernabeu.capacidad := 81000
+
+!create campnou : Estadio
+!set campnou.nombre := 'Spotify Camp Nou'
+!set campnou.capacidad := 99000
+
+!create metropolitano : Estadio
+!set metropolitano.nombre := 'Civitas Metropolitano'
+!set metropolitano.capacidad := 68000
+
+!create arbPrincipal : Arbitro
+!set arbPrincipal.nombre := 'Gil Manzano'
+!set arbPrincipal.tipo := TipoArbitro::principal
+
+!create arbVAR : Arbitro
+!set arbVAR.nombre := 'Hernandez Hernandez'
+!set arbVAR.tipo := TipoArbitro::VAR
+
+-- 3. Creación de Equipos
+-- -------------------------------------------------------------
+!create realMadrid : Equipo
+!set realMadrid.nombre := 'Real Madrid'
+!set realMadrid.ciudad := 'Madrid'
+!set realMadrid.presupuesto := 700000000
+!set realMadrid.entrenador := 'Carlo Ancelotti'
+
+!create barcelona : Equipo
+!set barcelona.nombre := 'FC Barcelona'
+!set barcelona.ciudad := 'Barcelona'
+!set barcelona.presupuesto := 600000000
+!set barcelona.entrenador := 'Hansi Flick'
+
+!create atletico : Equipo
+!set atletico.nombre := 'Atletico de Madrid'
+!set atletico.ciudad := 'Madrid'
+!set atletico.presupuesto := 400000000
+!set atletico.entrenador := 'Cholo Simeone'
+
+-- 4. Inscripciones y Fichas (Necesario para invariante ControlDorsalesPorFicha)
+-- -------------------------------------------------------------
+-- Inscripción Primer Equipo Madrid
+!create ins_rm_primero : Inscripcion
+!set ins_rm_primero.ficha := TipoFicha::primerEquipo
+!insert (ins_rm_primero, realMadrid) into InscripcionEquipo
+
+-- Inscripción Primer Equipo Barça
+!create ins_fcb_primero : Inscripcion
+!set ins_fcb_primero.ficha := TipoFicha::primerEquipo
+!insert (ins_fcb_primero, barcelona) into InscripcionEquipo
+
+-- Inscripción Filial Barça (Para probar regla de dorsales > 25)
+!create ins_fcb_filial : Inscripcion
+!set ins_fcb_filial.ficha := TipoFicha::Filial
+!insert (ins_fcb_filial, barcelona) into InscripcionEquipo
+
+-- 5. Creación de Jugadores y validación de Dorsales
+-- -------------------------------------------------------------
+
+-- Jugador 1: Portero Primer Equipo (Debe tener dorsal 1, 13 o 25)
+!create courtois : Jugador
+!set courtois.nombre := 'Thibaut Courtois'
+!set courtois.edad := 31
+!set courtois.posicion := Posicion::portero
+!set courtois.dorsal := 1 
+!insert (courtois, ins_rm_primero) into PertenenciaJugadorEquipo
+
+-- Jugador 2: Delantero Primer Equipo (No puede tener 1, 13, 25)
+!create vini : Jugador
+!set vini.nombre := 'Vinicius Jr'
+!set vini.edad := 23
+!set vini.posicion := Posicion::delantero
+!set vini.dorsal := 7
+!insert (vini, ins_rm_primero) into PertenenciaJugadorEquipo
+
+-- Jugador 3: Filial (Debe tener dorsal > 25)
+!create yamal : Jugador
+!set yamal.nombre := 'Lamine Yamal'
+!set yamal.edad := 16 -- Cumple EdadMinimaProfesional (>=16)
+!set yamal.posicion := Posicion::delantero
+!set yamal.dorsal := 27
+!insert (yamal, ins_fcb_filial) into PertenenciaJugadorEquipo
+
+-- Jugador 4: Portero Barça Primer Equipo
+!create terStegen : Jugador
+!set terStegen.nombre := 'Ter Stegen'
+!set terStegen.edad := 32
+!set terStegen.posicion := Posicion::portero
+!set terStegen.dorsal := 13 -- Válido para portero
+!insert (terStegen, ins_fcb_primero) into PertenenciaJugadorEquipo
+
+-- 6. Configuración del Partido (El Clásico)
+-- -------------------------------------------------------------
+!create elClasico : Partido
+!set elClasico.fecha := '2024-10-28'
+!set elClasico.golesLocal := 2
+!set elClasico.golesVisitante := 1
+
+-- Asociaciones básicas del partido
+!insert (elClasico, j1) into JornadaPartidos
+!insert (bernabeu, elClasico) into SedePartido
+!insert (elClasico, arbPrincipal) into ArbitrajePartido
+!insert (elClasico, arbVAR) into ArbitrajePartido
+
+-- 7. Estadísticas de Equipo (Association Classes)
+-- IMPORTANTE: Aquí validamos 'CoherenciaGolesCruzados' y 'SumaPosesionCien'
+-- -------------------------------------------------------------
+
+-- > Estadistica Local (Real Madrid)
+!insert (elClasico, realMadrid) into EstadisticaLocalPartido
+-- Capturamos el objeto de enlace creado para editar sus atributos
+!statLocal := EstadisticaLocalPartido.allInstances->any(s | s.local = elClasico)
+!set statLocal.posesion := 45
+!set statLocal.pasesDados := 400
+!set statLocal.rematesTotales := 10
+!set statLocal.rematesPuerta := 6 
+-- Debe ser <= rematesTotales
+-- golesFavor/Contra son derivados, no se setean manualmente, pero deben coincidir con Partido
+
+-- > Estadistica Visitante (Barcelona)
+!insert (elClasico, barcelona) into EstadisticaVisitantePartido
+!statVisit := EstadisticaVisitantePartido.allInstances->any(s | s.visitante = elClasico)
+!set statVisit.posesion := 55 
+-- 45 + 55 = 100 (Cumple invariante SumaPosesionCien)
+!set statVisit.pasesDados := 600
+!set statVisit.rematesTotales := 8
+!set statVisit.rematesPuerta := 3
+
+-- 8. Estadísticas de Jugadores
+-- -------------------------------------------------------------
+
+-- Vinicius (Marcó gol)
+!insert (elClasico, vini) into EstadisticaJugadorPartido
+!statVini := EstadisticaJugadorPartido.allInstances->any(s | s.jugador = vini)
+!set statVini.golesMarcados := 1
+!set statVini.golesRecibidos := 0
+!set statVini.tarjetasAmarillas := 0
+!set statVini.tarjetaRoja := 0
+!set statVini.minutosJugados := 90
+!set statVini.paradasRealizadas := 0 -- Obligatorio 0 por no ser portero
+
+-- Courtois (Portero Local, recibió 1 gol)
+!insert (elClasico, courtois) into EstadisticaJugadorPartido
+!statCourtois := EstadisticaJugadorPartido.allInstances->any(s | s.jugador = courtois)
+!set statCourtois.golesMarcados := 0
+!set statCourtois.golesRecibidos := 1
+!set statCourtois.paradasRealizadas := 2
+!set statCourtois.tarjetasAmarillas := 0
+!set statCourtois.tarjetaRoja := 0
+!set statCourtois.minutosJugados := 90
+
+-- Yamal (Marcó el gol del honor)
+!insert (elClasico, yamal) into EstadisticaJugadorPartido
+!statYamal := EstadisticaJugadorPartido.allInstances->any(s | s.jugador = yamal)
+!set statYamal.golesMarcados := 1
+!set statYamal.golesRecibidos := 0
+!set statYamal.paradasRealizadas := 0
+!set statYamal.tarjetasAmarillas := 1
+!set statYamal.tarjetaRoja := 0
+!set statYamal.minutosJugados := 75
+
+-- Ter Stegen (Portero Visitante, recibió 2 goles)
+!insert (elClasico, terStegen) into EstadisticaJugadorPartido
+!statMATS := EstadisticaJugadorPartido.allInstances->any(s | s.jugador = terStegen)
+!set statMATS.golesMarcados := 0
+!set statMATS.golesRecibidos := 2
+!set statMATS.paradasRealizadas := 4
+!set statMATS.tarjetasAmarillas := 0
+!set statMATS.tarjetaRoja := 0
+!set statMATS.minutosJugados := 90
+
+-- =============================================================
+-- Verificación Final
+-- =============================================================
+-- El comando 'check' verifica todas las invariantes definidas en el modelo.
+-- Si todo está bien, no debería dar errores.
+
+check
