@@ -55,16 +55,22 @@ reset
 -- Madrid: Ficha Primer Equipo
 !create ins_rm_1 : Inscripcion
 !set ins_rm_1.ficha := TipoFicha::primerEquipo
+!set ins_rm_1.fechaInicio := '2028-05-10'
+!set ins_rm_1.fechaFin := '2032-05-10'
 !insert (ins_rm_1, rm) into InscripcionEquipo
 
 -- Barça: Ficha Primer Equipo
 !create ins_fcb_1 : Inscripcion
 !set ins_fcb_1.ficha := TipoFicha::primerEquipo
+!set ins_fcb_1.fechaInicio := '2024-07-12'
+!set ins_fcb_1.fechaFin := '2030-07-12'
 !insert (ins_fcb_1, fcb) into InscripcionEquipo
 
 -- Barça: Ficha Filial (Para probar dorsales > 25)
 !create ins_fcb_B : Inscripcion
 !set ins_fcb_B.ficha := TipoFicha::Filial
+!set ins_fcb_B.fechaInicio := '2023-02-25'
+!set ins_fcb_B.fechaFin := '2029-02-25'
 !insert (ins_fcb_B, fcb) into InscripcionEquipo
 
 -- 4. JUGADORES Y VALIDACIÓN DE DORSALES
@@ -123,6 +129,8 @@ reset
 !set statLocal.rematesTotales := 10
 !set statLocal.rematesPuerta := 5
 !set statLocal.pasesDados := 300
+!set statLocal.penaltisRealizado := 1
+!set statLocal.penaltisRecibidos := 0
 -- Nota: golesFavor/Contra son derivados, se calculan solos al hacer check.
 
 -- > Visitante: Barcelona
@@ -132,6 +140,8 @@ reset
 !set statVisit.rematesTotales := 8
 !set statVisit.rematesPuerta := 3
 !set statVisit.pasesDados := 500
+!set statVisit.penaltisRealizado := 0
+!set statVisit.penaltisRecibidos := 1
 
 -- 7. ESTADÍSTICAS DE JUGADOR (Validar EstadisticasDePorteroSoloParaPorteros)
 -- -------------------------------------------------------------
